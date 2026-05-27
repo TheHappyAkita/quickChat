@@ -15,6 +15,30 @@ import type { ChatMessage, ChatSession, McpServer, McpToolDef } from '../../../s
 
 type OllamaTool = McpToolDef
 
+const TC_JSON_RE = /\[\s*\{\s*"name"\s*:\s*"[^"]+__[^"]+"/
+
+function looksLikeToolCallJson(text: string): boolean {
+  return TC_JSON_RE.test(text)
+}
+
+function parseTextToolCalls(text: string): Array<{ function: { name: string; arguments: Record<string, unknown> } }> {
+  const match = text.match(/(\[[\s\S]*?\}[\s\S]*?\])/)
+  if (!match) return []
+  try {
+    const arr = JSON.parse(match[1]!) as Array<{ name?: string; arguments?: Record<string, unknown> }>
+    if (!Array.isArray(arr)) return []
+    return arr
+      .filter(tc => typeof tc.name === 'string' && tc.name.includes('__'))
+      .map(tc => ({ function: { name: tc.name!, arguments: tc.arguments ?? {} } }))
+  } catch {
+    return []
+  }
+}
+
+function stripToolCallJson(text: string): string {
+  return text.replace(/\s*\[[\s\S]*?\{[\s\S]*?"name"[\s\S]*?\}[\s\S]*?\]\s*$/, '').trimEnd()
+}
+
 interface CompletionRequest {
   chatId: string
   messages: ChatMessage[]
@@ -134,6 +158,7 @@ export default defineEventHandler(async (event) => {
         const decoder = new TextDecoder()
         let buffer = ''
         let iterContent = ''
+        let pendingTokens = ''
         let toolCalls: Array<{ function: { name: string; arguments: Record<string, unknown> } }> = []
 
         while (true) {
@@ -156,8 +181,14 @@ export default defineEventHandler(async (event) => {
               const token = chunk.message?.content ?? ''
               if (token) {
                 iterContent += token
-                fullContent += token
-                broadcast(JSON.stringify({ token }))
+                pendingTokens += token
+                if (chunk.message?.tool_calls?.length) {
+                  pendingTokens = ''
+                } else if (!hasTools || !looksLikeToolCallJson(iterContent)) {
+                  fullContent += pendingTokens
+                  broadcast(JSON.stringify({ token: pendingTokens }))
+                  pendingTokens = ''
+                }
               }
               if (chunk.message?.tool_calls?.length) {
                 toolCalls = chunk.message.tool_calls
@@ -171,6 +202,19 @@ export default defineEventHandler(async (event) => {
                 }
               }
             } catch {}
+          }
+        }
+
+        if (toolCalls.length === 0 && hasTools) {
+          const fallback = parseTextToolCalls(iterContent)
+          if (fallback.length > 0) {
+            toolCalls = fallback
+            const stripped = stripToolCallJson(iterContent)
+            const delta = stripped.length - fullContent.length
+            if (delta < 0) {
+              fullContent = fullContent.slice(0, fullContent.length + delta)
+              broadcast(JSON.stringify({ stripTokens: -delta }))
+            }
           }
         }
 

@@ -146,7 +146,12 @@
             {{ session?.personaName ?? 'Assistant' }}
           </div>
           <div v-if="streamingContent" class="message-content" v-html="renderMarkdown(streamingContent)" />
-          <v-progress-circular v-else indeterminate size="20" width="2" color="primary" />
+          <div class="d-flex align-center ga-2">
+            <v-progress-circular indeterminate size="18" width="2" :color="activeTool ? 'secondary' : 'primary'" />
+            <span v-if="activeTool" class="text-caption text-medium-emphasis streaming-tool-hint">
+              {{ toolHintLabel(activeTool) }}
+            </span>
+          </div>
         </v-card>
       </div>
     </div>
@@ -343,6 +348,26 @@ function onPersonaChange(personaId: string | null) {
   }
 }
 
+const activeTool = computed(() =>
+  activeToolCalls.value.find(tc => tc.result === null) ?? null,
+)
+
+const TOOL_HINTS: Record<string, string> = {
+  web_search: 'Searching the web…',
+  fetch_url: 'Fetching URL…',
+  read_file: 'Reading file…',
+  list_directory: 'Listing directory…',
+}
+
+function toolHintLabel(tc: { name: string; args: Record<string, unknown> }): string {
+  const toolName = tc.name.split('__')[1] ?? tc.name
+  const hint = TOOL_HINTS[toolName]
+  if (hint) return hint
+  const firstArg = Object.values(tc.args)[0]
+  if (firstArg) return `Running ${toolName}: ${String(firstArg).slice(0, 40)}…`
+  return `Running ${toolName}…`
+}
+
 function renderMarkdown(content: string): string {
   const hasImages = /\[IMAGE:/.test(content)
   if (!hasImages) return marked(content) as string
@@ -500,8 +525,11 @@ async function connectStream(cId: string, signal?: AbortSignal, url = `/api/chat
             stats?: { totalDuration?: number; evalCount?: number; evalDuration?: number; promptEvalDuration?: number }
             toolCallRequest?: { callId: string; name: string; args: Record<string, unknown> }
             toolResult?: { callId?: string; name: string; result: string }
+            stripTokens?: number
           }
-          if (msg.toolCallRequest) {
+          if (msg.stripTokens) {
+            streamingContent.value = streamingContent.value.slice(0, -msg.stripTokens)
+          } else if (msg.toolCallRequest) {
             const { callId, name, args } = msg.toolCallRequest
             activeToolCalls.value.push({ callId, name, args, result: null })
             scrollToBottom()
@@ -614,6 +642,14 @@ watch(editTitleDialog, (v: boolean) => {
   display: flex;
   align-items: flex-end;
   gap: 4px;
+}
+
+.streaming-tool-hint {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
+  font-style: italic;
 }
 
 .tool-call-card {
