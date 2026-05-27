@@ -487,7 +487,8 @@ async function sendMessage() {
     temperature: selectedPersona.value?.temperature,
     contextSummary: session.value.contextSummary,
     summarizedUpTo: session.value.summarizedUpTo,
-    enabledMcpServerIds: selectedPersona.value?.enabledMcpServerIds ?? [],
+    enabledMcpServerIds: selectedPersona.value?.enabledMcpServerIds
+      ?? JSON.parse(localStorage.getItem('quickchat:defaultToolIds') ?? '[]'),
   })
 }
 
