@@ -250,7 +250,15 @@ export default defineEventHandler(async (event) => {
       }
 
       const assistantMessage: ChatMessage = { role: 'assistant', content: fullContent, timestamp: Date.now() }
-      const doneFrame = JSON.stringify({ done: true, content: fullContent, contextSummary, summarizedUpTo, trimmedMessages: messages, stats })
+      const summarizationChanged = summarizedUpTo !== body.summarizedUpTo
+      const doneFrame = JSON.stringify({
+        done: true,
+        content: fullContent,
+        contextSummary,
+        summarizedUpTo,
+        trimmedMessages: summarizationChanged ? messages : undefined,
+        stats,
+      })
 
       try {
         const db = useDatabase()

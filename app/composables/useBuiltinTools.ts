@@ -89,20 +89,24 @@ async function searxngSearch(query: string, baseUrl: string): Promise<string> {
 async function ddgHtmlSearch(query: string): Promise<string> {
   const res = await fetch(`/api/search/proxy?q=${encodeURIComponent(query)}&engine=ddg`)
   if (!res.ok) return `Search failed: ${res.status}`
-  const data = await res.json() as { html?: string }
-  if (!data.html) return `No results found for: ${query}`
-  const div = document.createElement('div')
-  div.innerHTML = data.html
-  const results: Array<{ title: string; url: string; snippet: string }> = []
-  div.querySelectorAll('.result').forEach((el) => {
-    const titleEl = el.querySelector('.result__title a, .result__a')
-    const snippetEl = el.querySelector('.result__snippet')
-    const title = titleEl?.textContent?.trim() ?? ''
-    const rawUrl = titleEl?.getAttribute('href') ?? ''
-    const url = rawUrl.startsWith('//') ? 'https:' + rawUrl : rawUrl
-    const snippet = snippetEl?.textContent?.trim() ?? ''
-    if (title && url && !url.includes('duckduckgo.com')) results.push({ title, url, snippet })
-  })
+  const data = await res.json() as { results?: Array<{ title: string; url: string; snippet: string }>; html?: string }
+
+  let results = data.results ?? []
+
+  if (!results.length && data.html) {
+    const div = document.createElement('div')
+    div.innerHTML = data.html
+    div.querySelectorAll('.result').forEach((el) => {
+      const titleEl = el.querySelector('.result__title a, .result__a')
+      const snippetEl = el.querySelector('.result__snippet')
+      const title = titleEl?.textContent?.trim() ?? ''
+      const rawUrl = titleEl?.getAttribute('href') ?? ''
+      const url = rawUrl.startsWith('//') ? 'https:' + rawUrl : rawUrl
+      const snippet = snippetEl?.textContent?.trim() ?? ''
+      if (title && url && !url.includes('duckduckgo.com')) results.push({ title, url, snippet })
+    })
+  }
+
   if (!results.length) return `No results found for: ${query}`
   return results.slice(0, 6).map((r, i) => `${i + 1}. **${r.title}**\n   ${r.url}\n   ${r.snippet}`).join('\n\n')
 }
