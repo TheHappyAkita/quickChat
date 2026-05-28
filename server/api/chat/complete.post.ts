@@ -181,13 +181,18 @@ export default defineEventHandler(async (event) => {
               const token = chunk.message?.content ?? ''
               if (token) {
                 iterContent += token
-                pendingTokens += token
                 if (chunk.message?.tool_calls?.length) {
+                  // structured tool_calls received — discard any held text
                   pendingTokens = ''
-                } else if (!hasTools || !looksLikeToolCallJson(iterContent)) {
-                  fullContent += pendingTokens
-                  broadcast(JSON.stringify({ token: pendingTokens }))
+                } else if (hasTools && looksLikeToolCallJson(iterContent)) {
+                  // accumulate without broadcasting — may be a text-mode tool call
+                  pendingTokens += token
+                } else {
+                  // flush any held tokens + current token
+                  const toSend = pendingTokens + token
                   pendingTokens = ''
+                  fullContent += toSend
+                  broadcast(JSON.stringify({ token: toSend }))
                 }
               }
               if (chunk.message?.tool_calls?.length) {
@@ -203,6 +208,12 @@ export default defineEventHandler(async (event) => {
               }
             } catch {}
           }
+        }
+
+        if (pendingTokens && toolCalls.length === 0) {
+          fullContent += pendingTokens
+          broadcast(JSON.stringify({ token: pendingTokens }))
+          pendingTokens = ''
         }
 
         if (toolCalls.length === 0 && hasTools) {

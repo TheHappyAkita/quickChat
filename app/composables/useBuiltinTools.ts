@@ -14,50 +14,97 @@ export interface BuiltinServerDef {
 }
 
 async function webSearch(query: string, config: Record<string, string>): Promise<string> {
-  const braveKey = config.braveApiKey
-  if (braveKey) {
-    const res = await fetch(
-      `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=5`,
-      { headers: { 'Accept': 'application/json', 'X-Subscription-Token': braveKey } },
-    )
-    if (res.ok) {
-      const data = await res.json() as { web?: { results?: Array<{ title: string; url: string; description: string }> } }
-      const results = data.web?.results ?? []
-      if (results.length) {
-        return results.map((r, i) => `${i + 1}. **${r.title}**\n   ${r.url}\n   ${r.description}`).join('\n\n')
+  if (config.tavilyApiKey) {
+    try { return await tavilySearch(query, config.tavilyApiKey) } catch {}
+  }
+  if (config.searxngUrl) {
+    try { return await searxngSearch(query, config.searxngUrl) } catch {}
+  }
+  if (config.braveApiKey) {
+    try {
+      const res = await fetch(
+        `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=8`,
+        { headers: { 'Accept': 'application/json', 'X-Subscription-Token': config.braveApiKey } },
+      )
+      if (res.ok) {
+        const data = await res.json() as { web?: { results?: Array<{ title: string; url: string; description: string }> } }
+        const results = data.web?.results ?? []
+        if (results.length)
+          return results.map((r, i) => `${i + 1}. **${r.title}**\n   ${r.url}\n   ${r.description}`).join('\n\n')
       }
+    } catch {}
+  }
+  try {
+    const ddgRes = await fetch(
+      `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`,
+      { headers: { 'Accept': 'application/json' } },
+    )
+    if (ddgRes.ok) {
+      const data = await ddgRes.json() as {
+        Answer?: string; AbstractText?: string; AbstractURL?: string; AbstractSource?: string
+        RelatedTopics?: Array<{ Text?: string; FirstURL?: string; Topics?: Array<{ Text?: string; FirstURL?: string }> }>
+        Results?: Array<{ Text?: string; FirstURL?: string }>
+      }
+      const parts: string[] = []
+      if (data.Answer) parts.push(`**Answer:** ${data.Answer}`)
+      if (data.AbstractText) parts.push(`**${data.AbstractSource ?? 'Summary'}:** ${data.AbstractText}\n${data.AbstractURL ?? ''}`)
+      const topics = (data.RelatedTopics ?? []).flatMap(t => t.Topics ? t.Topics : [t]).filter(t => t.Text).slice(0, 5)
+      if (topics.length) parts.push('**Related:**\n' + topics.map(t => `- ${t.Text}\n  ${t.FirstURL ?? ''}`).join('\n'))
+      const results = (data.Results ?? []).slice(0, 3)
+      if (results.length) parts.push('**Results:**\n' + results.map(r => `- ${r.Text}\n  ${r.FirstURL ?? ''}`).join('\n'))
+      if (parts.length) return parts.join('\n\n')
     }
-  }
+  } catch {}
+  return await ddgHtmlSearch(query)
+}
 
-  const ddgRes = await fetch(
-    `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`,
-    { headers: { 'Accept': 'application/json' } },
-  )
-  if (!ddgRes.ok) throw new Error(`Search failed: ${ddgRes.status}`)
-  const data = await ddgRes.json() as {
-    Answer?: string
-    AbstractText?: string
-    AbstractURL?: string
-    AbstractSource?: string
-    RelatedTopics?: Array<{ Text?: string; FirstURL?: string; Topics?: Array<{ Text?: string; FirstURL?: string }> }>
-    Results?: Array<{ Text?: string; FirstURL?: string }>
+async function tavilySearch(query: string, apiKey: string): Promise<string> {
+  const res = await fetch('https://api.tavily.com/search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ api_key: apiKey, query, max_results: 8, include_answer: true }),
+  })
+  if (!res.ok) throw new Error(`Tavily: ${res.status}`)
+  const data = await res.json() as {
+    answer?: string
+    results?: Array<{ title: string; url: string; content: string }>
   }
-
   const parts: string[] = []
-  if (data.Answer) parts.push(`**Answer:** ${data.Answer}`)
-  if (data.AbstractText) parts.push(`**${data.AbstractSource ?? 'Summary'}:** ${data.AbstractText}\n${data.AbstractURL ?? ''}`)
-  const topics = (data.RelatedTopics ?? []).flatMap(t =>
-    t.Topics ? t.Topics : [t],
-  ).filter(t => t.Text).slice(0, 5)
-  if (topics.length) {
-    parts.push('**Related:**\n' + topics.map(t => `- ${t.Text}\n  ${t.FirstURL ?? ''}`).join('\n'))
-  }
-  const results = (data.Results ?? []).slice(0, 3)
-  if (results.length) {
-    parts.push('**Results:**\n' + results.map(r => `- ${r.Text}\n  ${r.FirstURL ?? ''}`).join('\n'))
-  }
-  if (!parts.length) return `No results found for: ${query}`
-  return parts.join('\n\n')
+  if (data.answer) parts.push(`**Answer:** ${data.answer}`)
+  const results = (data.results ?? []).slice(0, 6)
+  if (results.length)
+    parts.push(results.map((r, i) => `${i + 1}. **${r.title}**\n   ${r.url}\n   ${r.content.slice(0, 200)}`).join('\n\n'))
+  return parts.length ? parts.join('\n\n') : `No results found for: ${query}`
+}
+
+async function searxngSearch(query: string, baseUrl: string): Promise<string> {
+  const res = await fetch(`/api/search/proxy?q=${encodeURIComponent(query)}&engine=searxng&searxng=${encodeURIComponent(baseUrl)}`)
+  if (!res.ok) throw new Error(`SearXNG: ${res.status}`)
+  const data = await res.json() as { results?: Array<{ title: string; url: string; content?: string }> }
+  const results = (data.results ?? []).slice(0, 6)
+  if (!results.length) return `No results found for: ${query}`
+  return results.map((r, i) => `${i + 1}. **${r.title}**\n   ${r.url}\n   ${r.content?.slice(0, 200) ?? ''}`).join('\n\n')
+}
+
+async function ddgHtmlSearch(query: string): Promise<string> {
+  const res = await fetch(`/api/search/proxy?q=${encodeURIComponent(query)}&engine=ddg`)
+  if (!res.ok) return `Search failed: ${res.status}`
+  const data = await res.json() as { html?: string }
+  if (!data.html) return `No results found for: ${query}`
+  const div = document.createElement('div')
+  div.innerHTML = data.html
+  const results: Array<{ title: string; url: string; snippet: string }> = []
+  div.querySelectorAll('.result').forEach((el) => {
+    const titleEl = el.querySelector('.result__title a, .result__a')
+    const snippetEl = el.querySelector('.result__snippet')
+    const title = titleEl?.textContent?.trim() ?? ''
+    const rawUrl = titleEl?.getAttribute('href') ?? ''
+    const url = rawUrl.startsWith('//') ? 'https:' + rawUrl : rawUrl
+    const snippet = snippetEl?.textContent?.trim() ?? ''
+    if (title && url && !url.includes('duckduckgo.com')) results.push({ title, url, snippet })
+  })
+  if (!results.length) return `No results found for: ${query}`
+  return results.slice(0, 6).map((r, i) => `${i + 1}. **${r.title}**\n   ${r.url}\n   ${r.snippet}`).join('\n\n')
 }
 
 const IMAGE_MIME_PREFIXES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp', 'image/svg', 'image/x-icon', 'image/tiff', 'image/avif']
@@ -95,7 +142,9 @@ export const BUILTIN_SERVERS: BuiltinServerDef[] = [
     description: 'Search the web using DuckDuckGo (free, no key) or Brave Search (optional API key for better results)',
     icon: 'mdi-magnify',
     configFields: [
-      { key: 'braveApiKey', label: 'Brave Search API Key (optional)', hint: 'Get a free key at search.brave.com/api — 2000 req/month free' },
+      { key: 'tavilyApiKey', label: 'Tavily API Key (recommended)', hint: 'Free key at app.tavily.com — 1000 req/month. Best results for AI agents.' },
+      { key: 'braveApiKey', label: 'Brave Search API Key', hint: 'Free key at search.brave.com/api — 2000 req/month.' },
+      { key: 'searxngUrl', label: 'SearXNG Base URL', hint: 'URL of a self-hosted SearXNG instance, e.g. http://localhost:8080' },
     ],
     tools: [
       {
