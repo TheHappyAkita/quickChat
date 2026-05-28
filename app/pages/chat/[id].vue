@@ -177,6 +177,16 @@
         >
           {{ selectedModel }}
         </v-chip>
+        <v-chip
+          size="small"
+          :variant="activeToolIds.length ? 'tonal' : 'outlined'"
+          :color="activeToolIds.length ? 'success' : 'default'"
+          prepend-icon="mdi-connection"
+          :title="activeToolIds.length ? `Tools active: ${activeToolIds.length}` : 'No tools active — configure in Settings'"
+          @click="navigateTo('/settings')"
+        >
+          {{ activeToolIds.length ? `${activeToolIds.length} tool${activeToolIds.length > 1 ? 's' : ''}` : 'No tools' }}
+        </v-chip>
         <v-expand-transition>
           <div v-if="showSettingsPopover" class="settings-popover">
             <v-select
@@ -347,6 +357,14 @@ function onPersonaChange(personaId: string | null) {
     if (persona?.model) selectedModel.value = persona.model
   }
 }
+
+const activeToolIds = computed<string[]>(() => {
+  if (selectedPersona.value?.enabledMcpServerIds?.length)
+    return selectedPersona.value.enabledMcpServerIds
+  try {
+    return JSON.parse(localStorage.getItem('quickchat:defaultToolIds') ?? '[]')
+  } catch { return [] }
+})
 
 const activeTool = computed(() =>
   activeToolCalls.value.find(tc => tc.result === null) ?? null,

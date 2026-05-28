@@ -156,7 +156,10 @@ const form = ref(defaultForm())
 
 function openCreate() {
   editingPersona.value = null
-  form.value = defaultForm()
+  form.value = {
+    ...defaultForm(),
+    enabledMcpServerIds: JSON.parse(localStorage.getItem('quickchat:defaultToolIds') ?? '[]'),
+  }
   dialog.value = true
 }
 
