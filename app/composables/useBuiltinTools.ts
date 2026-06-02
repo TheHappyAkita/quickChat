@@ -10,21 +10,21 @@ export interface BuiltinServerDef {
   icon: string
   tools: McpToolDef[]
   configFields?: Array<{ key: string; label: string; hint?: string; required?: boolean }>
-  execute(toolName: string, args: Record<string, unknown>, config: Record<string, string>): Promise<string>
+  execute(toolName: string, args: Record<string, unknown>, config: Record<string, string>, signal?: AbortSignal): Promise<string>
 }
 
-async function webSearch(query: string, config: Record<string, string>): Promise<string> {
+async function webSearch(query: string, config: Record<string, string>, signal?: AbortSignal): Promise<string> {
   if (config.tavilyApiKey) {
-    try { return await tavilySearch(query, config.tavilyApiKey) } catch {}
+    try { return await tavilySearch(query, config.tavilyApiKey, signal) } catch {}
   }
   if (config.searxngUrl) {
-    try { return await searxngSearch(query, config.searxngUrl) } catch {}
+    try { return await searxngSearch(query, config.searxngUrl, signal) } catch {}
   }
   if (config.braveApiKey) {
     try {
       const res = await fetch(
         `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=8`,
-        { headers: { 'Accept': 'application/json', 'X-Subscription-Token': config.braveApiKey } },
+        { headers: { 'Accept': 'application/json', 'X-Subscription-Token': config.braveApiKey }, signal },
       )
       if (res.ok) {
         const data = await res.json() as { web?: { results?: Array<{ title: string; url: string; description: string }> } }
@@ -37,7 +37,7 @@ async function webSearch(query: string, config: Record<string, string>): Promise
   try {
     const ddgRes = await fetch(
       `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`,
-      { headers: { 'Accept': 'application/json' } },
+      { headers: { 'Accept': 'application/json' }, signal },
     )
     if (ddgRes.ok) {
       const data = await ddgRes.json() as {
@@ -55,14 +55,15 @@ async function webSearch(query: string, config: Record<string, string>): Promise
       if (parts.length) return parts.join('\n\n')
     }
   } catch {}
-  return await ddgHtmlSearch(query)
+  return await ddgHtmlSearch(query, signal)
 }
 
-async function tavilySearch(query: string, apiKey: string): Promise<string> {
+async function tavilySearch(query: string, apiKey: string, signal?: AbortSignal): Promise<string> {
   const res = await fetch('https://api.tavily.com/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ api_key: apiKey, query, max_results: 8, include_answer: true }),
+    signal,
   })
   if (!res.ok) throw new Error(`Tavily: ${res.status}`)
   const data = await res.json() as {
@@ -77,8 +78,8 @@ async function tavilySearch(query: string, apiKey: string): Promise<string> {
   return parts.length ? parts.join('\n\n') : `No results found for: ${query}`
 }
 
-async function searxngSearch(query: string, baseUrl: string): Promise<string> {
-  const res = await fetch(`/api/search/proxy?q=${encodeURIComponent(query)}&engine=searxng&searxng=${encodeURIComponent(baseUrl)}`)
+async function searxngSearch(query: string, baseUrl: string, signal?: AbortSignal): Promise<string> {
+  const res = await fetch(`/api/search/proxy?q=${encodeURIComponent(query)}&engine=searxng&searxng=${encodeURIComponent(baseUrl)}`, { signal })
   if (!res.ok) throw new Error(`SearXNG: ${res.status}`)
   const data = await res.json() as { results?: Array<{ title: string; url: string; content?: string }> }
   const results = (data.results ?? []).slice(0, 6)
@@ -86,8 +87,8 @@ async function searxngSearch(query: string, baseUrl: string): Promise<string> {
   return results.map((r, i) => `${i + 1}. **${r.title}**\n   ${r.url}\n   ${r.content?.slice(0, 200) ?? ''}`).join('\n\n')
 }
 
-async function ddgHtmlSearch(query: string): Promise<string> {
-  const res = await fetch(`/api/search/proxy?q=${encodeURIComponent(query)}&engine=ddg`)
+async function ddgHtmlSearch(query: string, signal?: AbortSignal): Promise<string> {
+  const res = await fetch(`/api/search/proxy?q=${encodeURIComponent(query)}&engine=ddg`, { signal })
   if (!res.ok) return `Search failed: ${res.status}`
   const data = await res.json() as { results?: Array<{ title: string; url: string; snippet: string }>; html?: string }
 
@@ -114,8 +115,8 @@ async function ddgHtmlSearch(query: string): Promise<string> {
 const IMAGE_MIME_PREFIXES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp', 'image/svg', 'image/x-icon', 'image/tiff', 'image/avif']
 const IMAGE_URL_EXTS = /\.(png|jpg|jpeg|gif|webp|bmp|svg|ico|tiff|tif|avif)(\?.*)?$/i
 
-async function fetchUrl(url: string): Promise<string> {
-  const res = await fetch(url)
+async function fetchUrl(url: string, signal?: AbortSignal): Promise<string> {
+  const res = await fetch(url, { signal })
   if (!res.ok) throw new Error(`Fetch failed: ${res.status} ${res.statusText}`)
   const contentType = res.headers.get('content-type') ?? ''
   const isImage = IMAGE_MIME_PREFIXES.some(p => contentType.startsWith(p)) || IMAGE_URL_EXTS.test(url.split('?')[0]!)
@@ -180,12 +181,12 @@ export const BUILTIN_SERVERS: BuiltinServerDef[] = [
         },
       },
     ],
-    async execute(toolName, args, config) {
+    async execute(toolName, args, config, signal) {
       if (toolName === 'web_search') {
-        return await webSearch(String(args.query ?? ''), config)
+        return await webSearch(String(args.query ?? ''), config, signal)
       }
       if (toolName === 'fetch_url') {
-        return await fetchUrl(String(args.url ?? ''))
+        return await fetchUrl(String(args.url ?? ''), signal)
       }
       return `Unknown tool: ${toolName}`
     },

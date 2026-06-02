@@ -403,6 +403,9 @@ function renderMarkdown(content: string): string {
 }
 
 async function executeTool(callId: string, toolName: string, args: Record<string, unknown>) {
+  const ac = new AbortController()
+  const timer = setTimeout(() => ac.abort(), 25_000)
+
   let result = ''
   try {
     const sep = toolName.indexOf('__')
@@ -412,7 +415,7 @@ async function executeTool(callId: string, toolName: string, args: Record<string
     if (server?.type === 'builtin' && server.builtinId) {
       const builtin = findBuiltin(server.builtinId)
       if (builtin) {
-        result = await builtin.execute(actualName, args, server.builtinConfig ?? {})
+        result = await builtin.execute(actualName, args, server.builtinConfig ?? {}, ac.signal)
       } else {
         result = `Unknown builtin: ${server.builtinId}`
       }
@@ -421,6 +424,8 @@ async function executeTool(callId: string, toolName: string, args: Record<string
     }
   } catch (e) {
     result = `Tool error: ${e instanceof Error ? e.message : String(e)}`
+  } finally {
+    clearTimeout(timer)
   }
   await $fetch('/api/chat/tool-result', { method: 'POST', body: { callId, result } }).catch(() => {})
 }
