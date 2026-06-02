@@ -445,8 +445,6 @@ async function loadSession() {
     session.value = await $fetch<ChatSession>(`/api/chats/${chatId.value}`)
     if (session.value?.personaId) {
       selectedPersonaId.value = session.value.personaId
-      const persona = personaItems.value.find((p: AiPersona) => p.id === session.value?.personaId)
-      if (persona?.model) selectedModel.value = persona.model
     }
     const lastMsg = session.value?.messages.at(-1)
     if (lastMsg?.role === 'user' && session.value) {
