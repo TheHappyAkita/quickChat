@@ -74,15 +74,40 @@ export default defineEventHandler(async (event) => {
   }
 
   if (engine === 'ddg-images') {
-    const url = `https://duckduckgo.com/i.js?q=${encodeURIComponent(q)}&o=json`
+    const url = `https://duckduckgo.com/i.js?q=${encodeURIComponent(q)}&o=json&vqd=1&f=,,,&l=us-en`
     const res = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         'Accept': 'application/json',
+        'Referer': 'https://duckduckgo.com/',
       },
     })
     if (!res.ok) throw createError({ statusCode: res.status, message: `DDG Images error: ${res.status}` })
-    const data = await res.json() as { results?: Array<{ image: string; title: string; thumbnail: string; url: string }> }
+    const text = await res.text()
+    if (text.includes('If this error persists')) {
+      const htmlUrl = `https://duckduckgo.com/images?q=${encodeURIComponent(q)}`
+      const htmlRes = await fetch(htmlUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Accept': 'text/html',
+        },
+      })
+      if (!htmlRes.ok) throw createError({ statusCode: htmlRes.status, message: `DDG Images HTML error: ${htmlRes.status}` })
+      const html = await htmlRes.text()
+      const imageResults: Array<{ title: string; url: string; thumbnail: string }> = []
+      const imgMatches = html.match(/<img[^>]+class="tile--img[^>]*src="([^"]+)"[^>]*alt="([^"]*)"/g) ?? []
+      for (const match of imgMatches.slice(0, 6)) {
+        const srcMatch = match.match(/src="([^"]+)"/)
+        const altMatch = match.match(/alt="([^"]*)"/)
+        const src = srcMatch?.[1] ?? ''
+        const alt = altMatch?.[1] ?? ''
+        if (src && !src.includes('duckduckgo.com')) {
+          imageResults.push({ title: alt, url: src, thumbnail: src })
+        }
+      }
+      return { results: imageResults }
+    }
+    const data = JSON.parse(text) as { results?: Array<{ image: string; title: string; thumbnail: string; url: string }> }
     const results = (data.results ?? []).slice(0, 6).map(r => ({
       title: r.title || '',
       url: r.image || r.url || '',
