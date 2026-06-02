@@ -271,7 +271,7 @@ export default defineEventHandler(async (event) => {
             session.contextSummary = contextSummary
             session.summarizedUpTo = summarizedUpTo
           } else {
-            session.messages.push(assistantMessage)
+            session.messages = [...messages, assistantMessage]
           }
           session.updatedAt = Date.now()
           const payload = encryptForUser(userId, JSON.stringify(session))
