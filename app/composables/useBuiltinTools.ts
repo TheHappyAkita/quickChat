@@ -149,6 +149,16 @@ async function imageSearch(query: string, signal?: AbortSignal): Promise<string>
   return results.map((r, i) => `${i + 1}. **${r.title}**\n   ${r.url}\n   Thumbnail: ${r.thumbnail}`).join('\n\n')
 }
 
+async function fileSearch(query: string, extension?: string, signal?: AbortSignal): Promise<string> {
+  const searchQuery = extension ? `${query} filetype:${extension}` : query
+  const res = await fetch(`/api/search/proxy?q=${encodeURIComponent(searchQuery)}&engine=ddg`, { signal })
+  if (!res.ok) return `File search failed: ${res.status}`
+  const data = await res.json() as { results?: Array<{ title: string; url: string; snippet: string }> }
+  const results = (data.results ?? []).slice(0, 8)
+  if (!results.length) return `No files found for: ${query}`
+  return results.map((r, i) => `${i + 1}. **${r.title}**\n   ${r.url}\n   ${r.snippet}`).join('\n\n')
+}
+
 export const BUILTIN_SERVERS: BuiltinServerDef[] = [
   {
     id: 'builtin-websearch',
@@ -192,6 +202,21 @@ export const BUILTIN_SERVERS: BuiltinServerDef[] = [
       {
         type: 'function',
         function: {
+          name: 'file_search',
+          description: 'Search for downloadable files on the web by name, content, or file extension. Returns file URLs, titles, and descriptions. Use this when the user asks for specific files, documents, or downloads.',
+          parameters: {
+            type: 'object',
+            properties: {
+              query: { type: 'string', description: 'The file search query (name or content)' },
+              extension: { type: 'string', description: 'Optional file extension filter (e.g., pdf, zip, mp3)' },
+            },
+            required: ['query'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
           name: 'fetch_url',
           description: 'Fetch and read the text content of a web page or URL.',
           parameters: {
@@ -210,6 +235,9 @@ export const BUILTIN_SERVERS: BuiltinServerDef[] = [
       }
       if (toolName === 'image_search') {
         return await imageSearch(String(args.query ?? ''), signal)
+      }
+      if (toolName === 'file_search') {
+        return await fileSearch(String(args.query ?? ''), args.extension as string | undefined, signal)
       }
       if (toolName === 'fetch_url') {
         return await fetchUrl(String(args.url ?? ''), signal)
