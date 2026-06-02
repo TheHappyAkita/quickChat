@@ -12,6 +12,7 @@ export interface ChatSession {
   title: string
   personaId: string | null
   personaName: string | null
+  model: string
   messages: ChatMessage[]
   contextSummary?: string | null
   summarizedUpTo?: number | null

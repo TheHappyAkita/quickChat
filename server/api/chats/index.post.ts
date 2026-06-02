@@ -15,6 +15,7 @@ export default defineEventHandler(async (event) => {
     title: body.title || 'New Chat',
     personaId: body.personaId ?? null,
     personaName: body.personaName ?? null,
+    model: body.model || 'llama3',
     messages: body.messages || [],
     createdAt: body.createdAt || now,
     updatedAt: now,

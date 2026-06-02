@@ -273,6 +273,7 @@ export default defineEventHandler(async (event) => {
           } else {
             session.messages = [...messages, assistantMessage]
           }
+          session.model = body.model || session.model
           session.updatedAt = Date.now()
           const payload = encryptForUser(userId, JSON.stringify(session))
           await db.sql`UPDATE chats SET payload = ${payload}, updated_at = ${session.updatedAt} WHERE id = ${chatId} AND user_id = ${userId}`

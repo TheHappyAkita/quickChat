@@ -349,6 +349,13 @@ const modelItems = computed(() => availableModels.value.length ? availableModels
 
 watch(selectedModel, (val) => {
   localStorage.setItem('quickchat:selectedModel', val)
+  if (session.value) {
+    session.value.model = val
+    $fetch(`/api/chats/${session.value.id}`, {
+      method: 'PUT',
+      body: { model: val },
+    }).catch(() => {})
+  }
 })
 
 onMounted(async () => {
@@ -461,6 +468,9 @@ async function loadSession() {
     if (session.value?.personaId) {
       selectedPersonaId.value = session.value.personaId
     }
+    if (session.value?.model) {
+      selectedModel.value = session.value.model
+    }
     const lastMsg = session.value?.messages.at(-1)
     if (lastMsg?.role === 'user' && session.value) {
       streaming.value = true
@@ -501,6 +511,7 @@ async function sendMessage() {
         title: content.slice(0, 50),
         personaId: persona?.id ?? null,
         personaName: persona?.name ?? null,
+        model: selectedModel.value,
         messages: [userMessage],
       },
     })
