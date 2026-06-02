@@ -225,8 +225,7 @@
             rows="1"
             max-rows="6"
             hide-details
-            :disabled="streaming"
-            @keydown.enter.exact.prevent="sendMessage"
+            @keydown.enter.exact.prevent="!streaming && sendMessage()"
           />
         </v-col>
         <v-col cols="auto" class="ml-2 mb-1">
