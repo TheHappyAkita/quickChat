@@ -281,6 +281,12 @@ import type { ChatSession, AiPersona, McpServer } from '~/types'
 import { findBuiltin } from '~/composables/useBuiltinTools'
 import { renderWithImages } from '~/composables/useImageRenderer'
 
+onBeforeUnmount(() => {
+  if (streaming.value) {
+    abortRequest()
+  }
+})
+
 definePageMeta({ middleware: 'auth' })
 
 const route = useRoute()
