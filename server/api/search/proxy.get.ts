@@ -95,6 +95,7 @@ export default defineEventHandler(async (event) => {
       if (!htmlRes.ok) throw createError({ statusCode: htmlRes.status, message: `DDG Images HTML error: ${htmlRes.status}` })
       const html = await htmlRes.text()
       const imageResults: Array<{ title: string; url: string; thumbnail: string }> = []
+
       const imgMatches = html.match(/<img[^>]+class="tile--img[^>]*src="([^"]+)"[^>]*alt="([^"]*)"/g) ?? []
       for (const match of imgMatches.slice(0, 6)) {
         const srcMatch = match.match(/src="([^"]+)"/)
@@ -105,6 +106,18 @@ export default defineEventHandler(async (event) => {
           imageResults.push({ title: alt, url: src, thumbnail: src })
         }
       }
+
+      if (imageResults.length === 0) {
+        const allImgs = html.match(/<img[^>]+src="([^"]+)"[^>]*>/g) ?? []
+        for (const match of allImgs.slice(0, 10)) {
+          const srcMatch = match.match(/src="([^"]+)"/)
+          const src = srcMatch?.[1] ?? ''
+          if (src && src.startsWith('http') && !src.includes('duckduckgo.com') && (src.includes('.jpg') || src.includes('.png') || src.includes('.webp') || src.includes('.jpeg'))) {
+            imageResults.push({ title: '', url: src, thumbnail: src })
+          }
+        }
+      }
+
       return { results: imageResults }
     }
     const data = JSON.parse(text) as { results?: Array<{ image: string; title: string; thumbnail: string; url: string }> }
