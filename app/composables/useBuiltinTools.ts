@@ -144,10 +144,10 @@ export const BUILTIN_SERVERS: BuiltinServerDef[] = [
   {
     id: 'builtin-websearch',
     name: 'Web Search',
-    description: 'Search the web using DuckDuckGo (free, no key) or Brave Search (optional API key for better results)',
+    description: 'Search the web. Recommended: Tavily API (free, purpose-built for AI). Fallback: DuckDuckGo (no key required).',
     icon: 'mdi-magnify',
     configFields: [
-      { key: 'tavilyApiKey', label: 'Tavily API Key (recommended)', hint: 'Free key at app.tavily.com — 1000 req/month. Best results for AI agents.' },
+      { key: 'tavilyApiKey', label: 'Tavily API Key (recommended)', hint: 'Get a free key at app.tavily.com — 1000 req/month. Best results for AI agents.', required: false },
       { key: 'braveApiKey', label: 'Brave Search API Key', hint: 'Free key at search.brave.com/api — 2000 req/month.' },
       { key: 'searxngUrl', label: 'SearXNG Base URL', hint: 'URL of a self-hosted SearXNG instance, e.g. http://localhost:8080' },
     ],

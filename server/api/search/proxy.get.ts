@@ -5,18 +5,42 @@ import { requireAuth } from '../../utils/auth'
 
 function parseDdgHtml(html: string): Array<{ title: string; url: string; snippet: string }> {
   const results: Array<{ title: string; url: string; snippet: string }> = []
+
   const resultBlocks = html.match(/<div class="result[^"]*"[\s\S]*?(?=<div class="result[^"]*"|<\/div>\s*<\/div>\s*<\/div>\s*$)/g) ?? []
   for (const block of resultBlocks) {
+    let url = ''
+    let title = ''
+    let snippet = ''
+
     const urlMatch = block.match(/href="(https?:\/\/[^"]+)"/)
+    if (urlMatch?.[1]) url = urlMatch[1]
+
     const titleMatch = block.match(/<a[^>]+class="result__a"[^>]*>([\s\S]*?)<\/a>/)
+    if (titleMatch?.[1]) title = titleMatch[1].replace(/<[^>]+>/g, '').trim()
+
     const snippetMatch = block.match(/class="result__snippet"[^>]*>([\s\S]*?)<\//)
-    const url = urlMatch?.[1] ?? ''
-    const title = titleMatch?.[1]?.replace(/<[^>]+>/g, '').trim() ?? ''
-    const snippet = snippetMatch?.[1]?.replace(/<[^>]+>/g, '').trim() ?? ''
+    if (snippetMatch?.[1]) snippet = snippetMatch[1].replace(/<[^>]+>/g, '').trim()
+
     if (url && title && !url.includes('duckduckgo.com')) {
       results.push({ title, url, snippet })
     }
   }
+
+  if (results.length) return results
+
+  const webResults = html.match(/<a class="result__a"[^>]*href="([^"]+)"[^>]*>([^<]+)<\/a>[\s\S]*?<a class="result__snippet"[^>]*>([^<]+)<\/a>/g) ?? []
+  for (const match of webResults) {
+    const urlMatch = match.match(/href="([^"]+)"/)
+    const titleMatch = match.match(/>([^<]+)<\/a>/)
+    const snippetMatch = match.match(/result__snippet"[^>]*>([^<]+)<\/a>/)
+    const url = urlMatch?.[1] ?? ''
+    const title = titleMatch?.[1]?.trim() ?? ''
+    const snippet = snippetMatch?.[1]?.trim() ?? ''
+    if (url && title && !url.includes('duckduckgo.com')) {
+      results.push({ title, url, snippet })
+    }
+  }
+
   return results
 }
 
