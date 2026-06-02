@@ -41,6 +41,19 @@ function parseDdgHtml(html: string): Array<{ title: string; url: string; snippet
     }
   }
 
+  if (results.length) return results
+
+  const allLinks = html.match(/<a[^>]+class="result__a"[^>]*href="([^"]+)"[^>]*>([^<]+)<\/a>/g) ?? []
+  for (const match of allLinks) {
+    const urlMatch = match.match(/href="([^"]+)"/)
+    const titleMatch = match.match(/>([^<]+)<\/a>/)
+    const url = urlMatch?.[1] ?? ''
+    const title = titleMatch?.[1]?.trim() ?? ''
+    if (url && title && !url.includes('duckduckgo.com')) {
+      results.push({ title, url, snippet: '' })
+    }
+  }
+
   return results
 }
 

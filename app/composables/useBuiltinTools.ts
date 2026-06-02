@@ -34,6 +34,10 @@ async function webSearch(query: string, config: Record<string, string>, signal?:
       }
     } catch {}
   }
+  const htmlResult = await ddgHtmlSearch(query, signal)
+  if (!htmlResult.startsWith('Search failed') && !htmlResult.startsWith('No results')) {
+    return htmlResult
+  }
   try {
     const ddgRes = await fetch(
       `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`,
@@ -55,7 +59,7 @@ async function webSearch(query: string, config: Record<string, string>, signal?:
       if (parts.length) return parts.join('\n\n')
     }
   } catch {}
-  return await ddgHtmlSearch(query, signal)
+  return htmlResult
 }
 
 async function tavilySearch(query: string, apiKey: string, signal?: AbortSignal): Promise<string> {
