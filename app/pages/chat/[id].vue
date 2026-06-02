@@ -330,17 +330,26 @@ const { data: personas } = await useFetch<AiPersona[]>('/api/personas', { server
 const personaItems = computed(() => personas.value ?? [])
 const selectedPersona = computed(() => personaItems.value.find((p: AiPersona) => p.id === selectedPersonaId.value) ?? null)
 
-watch(personaItems, (items) => {
-  if (items.length && selectedPersonaId.value) {
-    const persona = items.find((p: AiPersona) => p.id === selectedPersonaId.value)
+let initialPersonaLoad = true
+watch(selectedPersonaId, (newId, oldId) => {
+  if (initialPersonaLoad) {
+    initialPersonaLoad = false
+    return
+  }
+  if (newId && personaItems.value.length) {
+    const persona = personaItems.value.find((p: AiPersona) => p.id === newId)
     if (persona?.model) selectedModel.value = persona.model
   }
-}, { once: true })
+})
 
 const modelsLoading = ref(true)
 const availableModels = ref<string[]>([])
-const selectedModel = ref('llama3')
+const selectedModel = ref(localStorage.getItem('quickchat:selectedModel') || 'llama3')
 const modelItems = computed(() => availableModels.value.length ? availableModels.value : [selectedModel.value])
+
+watch(selectedModel, (val) => {
+  localStorage.setItem('quickchat:selectedModel', val)
+})
 
 onMounted(async () => {
   scrollToBottom()
