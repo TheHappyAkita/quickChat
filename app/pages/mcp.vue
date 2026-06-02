@@ -94,6 +94,15 @@
                   class="mb-3"
                 />
               </template>
+              <div class="mt-4">
+                <div class="text-body-2 font-weight-medium mb-2">Available tools:</div>
+                <v-list density="compact" variant="tonal" class="bg-surface">
+                  <v-list-item v-for="tool in selectedBuiltinDef.tools" :key="tool.function.name">
+                    <v-list-item-title class="text-body-2">{{ tool.function.name }}</v-list-item-title>
+                    <v-list-item-subtitle class="text-caption">{{ tool.function.description }}</v-list-item-subtitle>
+                  </v-list-item>
+                </v-list>
+              </div>
             </template>
           </template>
 

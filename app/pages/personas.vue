@@ -93,7 +93,11 @@
                 :label="srv.name"
                 density="compact"
                 hide-details
-              />
+              >
+                <template v-slot:append>
+                  <v-btn size="x-small" variant="text" icon="mdi-information-outline" @click.stop="showToolsDialog(srv)" />
+                </template>
+              </v-checkbox>
             </v-card>
             <div class="text-caption text-medium-emphasis mb-2">Only enable for models that support tool calls (e.g. llama3.1, qwen2.5)</div>
           </template>
@@ -105,6 +109,24 @@
           <v-spacer />
           <v-btn @click="dialog = false">Cancel</v-btn>
           <v-btn color="primary" :loading="saving" @click="savePersona">Save</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="toolsDialog" max-width="500">
+      <v-card>
+        <v-card-title>{{ toolsServer?.name }} - Tools</v-card-title>
+        <v-card-text>
+          <v-list density="compact" variant="tonal" class="bg-surface">
+            <v-list-item v-for="tool in toolsServer?.tools ?? []" :key="tool.function.name">
+              <v-list-item-title class="text-body-2">{{ tool.function.name }}</v-list-item-title>
+              <v-list-item-subtitle class="text-caption">{{ tool.function.description }}</v-list-item-subtitle>
+            </v-list-item>
+          </v-list>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn @click="toolsDialog = false">Close</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -143,6 +165,8 @@ const saving = ref(false)
 const editingPersona = ref<AiPersona | null>(null)
 const deleteDialog = ref(false)
 const deletingPersona = ref<AiPersona | null>(null)
+const toolsDialog = ref(false)
+const toolsServer = ref<McpServer | null>(null)
 
 const defaultForm = () => ({
   name: '',
@@ -195,6 +219,11 @@ async function savePersona() {
 function confirmDeletePersona(persona: AiPersona) {
   deletingPersona.value = persona
   deleteDialog.value = true
+}
+
+function showToolsDialog(server: McpServer) {
+  toolsServer.value = server
+  toolsDialog.value = true
 }
 
 async function deletePersona() {
