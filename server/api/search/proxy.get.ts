@@ -60,6 +60,24 @@ export default defineEventHandler(async (event) => {
     return await res.json()
   }
 
+  if (engine === 'ddg-images') {
+    const url = `https://duckduckgo.com/i.js?q=${encodeURIComponent(q)}&o=json`
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+      },
+    })
+    if (!res.ok) throw createError({ statusCode: res.status, message: `DDG Images error: ${res.status}` })
+    const data = await res.json() as { results?: Array<{ image: string; title: string; thumbnail: string; url: string }> }
+    const results = (data.results ?? []).slice(0, 6).map(r => ({
+      title: r.title || '',
+      url: r.image || r.url || '',
+      thumbnail: r.thumbnail || '',
+    }))
+    return { results }
+  }
+
   const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`
   const res = await fetch(url, {
     headers: {

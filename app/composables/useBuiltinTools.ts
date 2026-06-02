@@ -140,6 +140,15 @@ async function fetchUrl(url: string, signal?: AbortSignal): Promise<string> {
   return (await res.text()).slice(0, 8000)
 }
 
+async function imageSearch(query: string, signal?: AbortSignal): Promise<string> {
+  const res = await fetch(`/api/search/proxy?q=${encodeURIComponent(query)}&engine=ddg-images`, { signal })
+  if (!res.ok) return `Image search failed: ${res.status}`
+  const data = await res.json() as { results?: Array<{ title: string; url: string; thumbnail: string }> }
+  const results = (data.results ?? []).slice(0, 6)
+  if (!results.length) return `No images found for: ${query}`
+  return results.map((r, i) => `${i + 1}. **${r.title}**\n   ${r.url}\n   Thumbnail: ${r.thumbnail}`).join('\n\n')
+}
+
 export const BUILTIN_SERVERS: BuiltinServerDef[] = [
   {
     id: 'builtin-websearch',
@@ -169,6 +178,20 @@ export const BUILTIN_SERVERS: BuiltinServerDef[] = [
       {
         type: 'function',
         function: {
+          name: 'image_search',
+          description: 'Search for images on the web. Returns image URLs, titles, and thumbnails. Use this when the user asks for pictures, photos, or visual content.',
+          parameters: {
+            type: 'object',
+            properties: {
+              query: { type: 'string', description: 'The image search query' },
+            },
+            required: ['query'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
           name: 'fetch_url',
           description: 'Fetch and read the text content of a web page or URL.',
           parameters: {
@@ -184,6 +207,9 @@ export const BUILTIN_SERVERS: BuiltinServerDef[] = [
     async execute(toolName, args, config, signal) {
       if (toolName === 'web_search') {
         return await webSearch(String(args.query ?? ''), config, signal)
+      }
+      if (toolName === 'image_search') {
+        return await imageSearch(String(args.query ?? ''), signal)
       }
       if (toolName === 'fetch_url') {
         return await fetchUrl(String(args.url ?? ''), signal)
