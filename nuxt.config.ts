@@ -10,6 +10,8 @@ export default defineNuxtConfig({
     strict: true,
   },
 
+  css: ['~/assets/css/fonts.css'],
+
   modules: [
     'vuetify-nuxt-module',
     '@pinia/nuxt',

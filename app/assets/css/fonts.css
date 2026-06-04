@@ -1,0 +1,25 @@
+/* Fira Code Font (local, no network dependency) */
+
+@font-face {
+  font-family: 'Fira Code';
+  src: url('/fonts/firacode-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Fira Code';
+  src: url('/fonts/firacode-medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Apply Fira Code globally with fallbacks for broad Unicode coverage */
+html body,
+html .v-application,
+html .v-application * {
+  font-family: 'Fira Code', 'Noto Sans', 'Segoe UI', system-ui, -apple-system, sans-serif !important;
+  font-feature-settings: "calt" 1;
+}
